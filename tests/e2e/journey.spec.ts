@@ -102,6 +102,7 @@ test('预设教学仍可发接发、选择回应并保存旧局面', async ({ pa
   await page.getByRole('button', { name: '保存局面' }).click()
   await page.getByRole('dialog', { name: '保存战术局面' }).getByLabel('局面名称').fill('旧版教学存档')
   await page.getByRole('dialog', { name: '保存战术局面' }).getByRole('button', { name: '保存' }).click()
+  await expect(page.getByRole('status')).toContainText('战术局面已保存到本设备浏览器。')
   await page.reload()
   await page.getByRole('link', { name: '我的局面' }).click()
   await expect(page.getByRole('heading', { name: '旧版教学存档' })).toBeVisible()
