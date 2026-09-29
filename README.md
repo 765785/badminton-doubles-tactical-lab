@@ -2,7 +2,7 @@
 
 一个用中文解释双打击球与搭档跑位的静态教学网站。四名球员分别编辑，拖动斜视球场上的球员与羽毛球后，可查看 0–3 条有条件、有证据编号的建议，选择对方回应并播放逐拍战术链。局面和球员名片保存在当前浏览器的 IndexedDB。
 
-目标公开地址：<https://765785.github.io/badminton-doubles-tactical-lab/>（上线状态以实际访问为准）。
+在线网站：<https://765785.github.io/badminton-doubles-tactical-lab/>。2026-09-29 已通过公开网址访问、资源检查和 Chromium 基础功能验收。
 
 ## 本地运行
 
@@ -21,6 +21,8 @@ npm run preview
 ```
 
 检查：`npm run typecheck`、`npm run lint`、`npm run test`、`npx playwright install chromium`、`npm run test:e2e`。构建输出为 `dist/`。
+
+如需对线上站点重复浏览器验收，可在运行 `npm run test:e2e` 前设置 `E2E_BASE_URL=https://765785.github.io/badminton-doubles-tactical-lab/`；网络环境需要代理时另设 `E2E_PROXY`。
 
 ## 设计与资料原则
 
