@@ -1,12 +1,14 @@
 import {
   COURT_LENGTH, COURT_WIDTH, DOUBLE_LONG_SERVICE_DISTANCE, NET_Y, PLAYER_IDS,
   SHORT_SERVICE_DISTANCE, distance, opponentIds, partnerOf, teamOf,
-  type AnalysisIssue, type AnalysisResult, type ChainStep, type CourtState,
+  type AnalysisIssue, type AnalysisResult, type CourtState,
   type Movement, type PlayerCard, type PlayerId, type Point3, type RallyContext,
   type ResponseOption, type ShotType, type TacticalRecommendation,
-  type RecommendationLevel, competitionFormat,
+  type RecommendationLevel, type LawVersion, competitionFormat,
 } from '../domain/model'
 import { activeLawVersion } from '../knowledge/laws'
+import { evaluateGuidedShot } from './guidedLesson'
+import { EVIDENCE_DATASET_VERSION, SIMULATION_PARAMETERS } from './simulationParameters'
 
 type Cards = Record<PlayerId, PlayerCard>
 type Candidate = Omit<TacticalRecommendation, 'level' | 'tacticalScore' | 'hitterMovement' | 'partnerMovement' | 'expectedOpponentResponses'> & { base: number }
@@ -24,7 +26,8 @@ const coachEvidence = (cards: Cards) => {
 
 export function validateCourt(court: CourtState, cards: Cards, context: RallyContext, asOf = new Date()): AnalysisIssue[] {
   const issues: AnalysisIssue[] = []
-  if (!activeLawVersion(asOf)) issues.push({ code: 'law-version', message: '当前没有完成核验的生效竞赛规则版本。', action: '请等待规则资料更新后再分析。' })
+  const lawVersion = activeLawVersion(asOf)
+  if (!lawVersion) issues.push({ code: 'law-version', message: '当前没有完成核验的生效竞赛规则版本。', action: '请等待规则资料更新后再分析。' })
   for (const id of PLAYER_IDS) {
     const player = court.players[id]
     if (!cards[id] || !player || !Number.isFinite(player.x) || !Number.isFinite(player.y)) {
@@ -64,7 +67,7 @@ export function validateCourt(court: CourtState, cards: Cards, context: RallyCon
         if (!diagonal) issues.push({ code: 'receiver-court', message: '接发球员不在斜对角发球区。', action: '调整接发球员站位。' })
       }
     }
-    if (shuttle.z >= 1.15) issues.push({ code: 'serve-height', message: '发球接触高度达到或超过规则限制。', action: '将球的击球高度调低至 1.15 米以下。' })
+    if (lawVersion && shuttle.z >= lawVersion.serviceHeightLimitMeters) issues.push({ code: 'serve-height', message: '发球接触高度达到或超过规则限制。', action: `将球的击球高度调低至 ${lawVersion.serviceHeightLimitMeters} 米以下。` })
   }
   return issues
 }
@@ -91,7 +94,7 @@ function candidate(id: string, shotType: ShotType, title: string, target: Point3
   return { id, shotType, title, target, targetZone, base, explanation: { simple, advanced }, risks, conditions, evidenceIds }
 }
 
-function generateCandidates(court: CourtState, cards: Cards, context: RallyContext, situation: RallyContext['initiative']): Candidate[] {
+function generateCandidates(court: CourtState, cards: Cards, context: RallyContext, situation: RallyContext['initiative'], lawVersion: LawVersion): Candidate[] {
   const id = court.hitterId
   const x = court.shuttle.x
   const opp = opponentIds(id)
@@ -107,10 +110,10 @@ function generateCandidates(court: CourtState, cards: Cards, context: RallyConte
     const serveY = teamOf(id) === 1 ? 4.55 : 8.85
     const rearY = teamOf(id) === 1 ? 1.2 : 12.2
     return [
-      candidate('serve-t', 'lowServe', '低发球到中线', p3(targetSideX, serveY, .1), '斜对角发球区中线附近', 68, '球落在中线附近，可以减少接发球的大角度选择；发球后准备封网。', '低发球压缩接发角度，搭档应准备中后场的推球或挑球。', ['发球质量不足时，接发者可能抢到高点。'], ['发球点与落点均在有效发球区。'], ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_SERVE']),
-      candidate('serve-body', 'lowServe', '低发球到身体', p3(limit(receiver.x, .5, 5.6), serveY - (teamOf(id) === 1 ? .15 : -.15), .1), '接发者身体附近', 59, '把球送到接发者身体附近，可能打乱其习惯的接发动作。', '身体线低发球是教学中的位置变化；需要发球者与搭档准备后续覆盖。', ['落点过高会给对方直接攻击机会。'], ['必须落在斜对角发球区。'], ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_SERVE']),
-      candidate('serve-flick', 'flickServe', '偷后场发球', p3(receiver.x, rearY, .1), '接发者身后', 53, '偶尔把球发到后场，可让准备前扑的接发者后退。', '偷后场是变化选择；若对方平衡良好，可能直接下压。', ['对方抢到高点时，我方容易转入防守。'], ['作为变化球使用，不代替稳定低发球。'], ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_SERVE']),
-      candidate('serve-wide', 'lowServe', '低发球到外侧', p3(targetSideX < 3.05 ? .65 : 5.45, serveY, .1), '斜对角外侧', 44, '外侧落点可以改变接发方向，但必须提前准备直线回球。', '宽发球增加自身暴露空间，需评估搭档覆盖。', ['直线回球可能直接打到空当。'], ['发球者和搭档能够覆盖直线回球。'], ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_SERVE']),
+      candidate('serve-t', 'lowServe', '低发球到中线', p3(targetSideX, serveY, .1), '斜对角发球区中线附近', 68, '球落在中线附近，可以减少接发球的大角度选择；发球后准备封网。', '低发球压缩接发角度，搭档应准备中后场的推球或挑球。', ['发球质量不足时，接发者可能抢到高点。'], ['发球点与落点均在有效发球区。'], [lawVersion.evidenceId, 'COACH_BWF_L1_2017_SERVE']),
+      candidate('serve-body', 'lowServe', '低发球到身体', p3(limit(receiver.x, .5, 5.6), serveY - (teamOf(id) === 1 ? .15 : -.15), .1), '接发者身体附近', 59, '把球送到接发者身体附近，可能打乱其习惯的接发动作。', '身体线低发球是教学中的位置变化；需要发球者与搭档准备后续覆盖。', ['落点过高会给对方直接攻击机会。'], ['必须落在斜对角发球区。'], [lawVersion.evidenceId, 'COACH_BWF_L1_2017_SERVE']),
+      candidate('serve-flick', 'flickServe', '偷后场发球', p3(receiver.x, rearY, .1), '接发者身后', 53, '偶尔把球发到后场，可让准备前扑的接发者后退。', '偷后场是变化选择；若对方平衡良好，可能直接下压。', ['对方抢到高点时，我方容易转入防守。'], ['作为变化球使用，不代替稳定低发球。'], [lawVersion.evidenceId, 'COACH_BWF_L1_2017_SERVE']),
+      candidate('serve-wide', 'lowServe', '低发球到外侧', p3(targetSideX < 3.05 ? .65 : 5.45, serveY, .1), '斜对角外侧', 44, '外侧落点可以改变接发方向，但必须提前准备直线回球。', '宽发球增加自身暴露空间，需评估搭档覆盖。', ['直线回球可能直接打到空当。'], ['发球者和搭档能够覆盖直线回球。'], [lawVersion.evidenceId, 'COACH_BWF_L1_2017_SERVE']),
     ].filter((item) => validServiceTarget(item.target, id, context.servingScore ?? 0))
   }
   if (context.phase === 'return') {
@@ -149,32 +152,6 @@ function generateCandidates(court: CourtState, cards: Cards, context: RallyConte
   ]
 }
 
-function movementFor(court: CourtState, shot: ShotType, target: Point3): { hitterMovement: Movement; partnerMovement: Movement } {
-  const id = court.hitterId
-  const own = court.players[id]
-  const partner = court.players[partnerOf(id)]
-  if (shot === 'lowServe' || shot === 'flickServe') return {
-    hitterMovement: { to: { x: own.x, y: ownFrontY(id) }, description: '发球后留意网前回球，并向中前场准备。' },
-    partnerMovement: { to: { x: partner.x, y: ownRearY(id) - (teamOf(id) === 1 ? .4 : -.4) }, description: '搭档覆盖中后场的推球与挑球。' },
-  }
-  if (shot === 'middleSmash' || shot === 'straightSmash' || shot === 'straightDrop' || shot === 'crossDrop') return {
-    hitterMovement: { to: { x: limit(own.x * .7 + 3.05 * .3, .4, 5.7), y: ownRearY(id) }, description: '击球后恢复到可继续覆盖中后场的位置。' },
-    partnerMovement: { to: { x: limit(target.x * .55 + 3.05 * .45, .7, 5.4), y: ownFrontY(id) }, description: '搭档向球路一侧的中前场移动，准备拦截挡网。' },
-  }
-  if (shot === 'block' || shot === 'net') return {
-    hitterMovement: { to: { x: limit(own.x, .6, 5.5), y: ownFrontY(id) }, description: '击球后适当前压，准备对方回放网前。' },
-    partnerMovement: { to: { x: limit(partner.x, .6, 5.5), y: ownRearY(id) - (teamOf(id) === 1 ? .6 : -.6) }, description: '搭档补住中后场，准备对方推球或起高球。' },
-  }
-  if (shot === 'lift') return {
-    hitterMovement: { to: { x: own.x < 3.05 ? 1.55 : 4.55, y: teamOf(id) === 1 ? 9.6 : 3.8 }, description: '后撤到本侧，转入左右防守。' },
-    partnerMovement: { to: { x: own.x < 3.05 ? 4.55 : 1.55, y: teamOf(id) === 1 ? 9.6 : 3.8 }, description: '搭档移动到另一侧，覆盖直线和中路。' },
-  }
-  return {
-    hitterMovement: { to: { x: limit(own.x, .6, 5.5), y: ownFrontY(id) + (teamOf(id) === 1 ? .5 : -.5) }, description: '跟进球路，准备截击直线回球。' },
-    partnerMovement: { to: { x: limit(partner.x, .6, 5.5), y: ownRearY(id) }, description: '搭档保持中后场覆盖。' },
-  }
-}
-
 function responseOptions(court: CourtState, shot: ShotType, movement: { hitterMovement: Movement; partnerMovement: Movement }): ResponseOption[] {
   const id = court.hitterId
   const ownFront = ownFrontY(id)
@@ -192,37 +169,12 @@ function responseOptions(court: CourtState, shot: ShotType, movement: { hitterMo
   ]
 }
 
-function scoreCandidate(item: Candidate, court: CourtState, cards: Cards): { score: number; attributeNote: string } {
-  const id = court.hitterId
-  const closestId = opponentIds(id).sort((a, b) => distance(court.players[a], item.target) - distance(court.players[b], item.target))[0]
-  const closest = court.players[closestId]
-  const oppCard = cards[closestId]
-  const hitter = cards[id]
-  let score = item.base + limit(distance(closest, item.target) * 2, 0, 8)
-  if (item.shotType === 'middleSmash' || item.shotType === 'straightSmash') score += (hitter.attributes.smashPower - 60) * .14
-  if (item.shotType === 'lowServe' || item.shotType === 'flickServe') score += (hitter.attributes.serve - 60) * .12
-  if (item.id.startsWith('return')) score += (hitter.attributes.serveReturn - 60) * .1
-  if (item.shotType === 'drive') score += (hitter.attributes.drive - 60) * .12
-  if (item.shotType === 'net' || item.shotType === 'block') score += (hitter.attributes.netPlay - 60) * .1
-  let attributeNote = ''
-  if (distance(closest, item.target) < 1.65 && oppCard.attributes.defence < 50) {
-    score += (50 - oppCard.attributes.defence) * .14
-    attributeNote = `对方球员 ${closestId} 的防守能力设置较低，这会提高该落点的排序。`
-  }
-  const backhandSide = (teamOf(closestId) === 2) === (oppCard.dominantHand === 'right') ? item.target.x > closest.x : item.target.x < closest.x
-  if (distance(closest, item.target) < 1.4 && Math.abs(item.target.x - closest.x) > .25 && backhandSide && oppCard.attributes.backhand < 50) {
-    score += (50 - oppCard.attributes.backhand) * .16
-    attributeNote = `对方球员 ${closestId} 的反手能力设置较低，这会提高该落点的排序。`
-  }
-  return { score: Math.round(limit(score, 0, 100)), attributeNote }
-}
-
 export function analyze(court: CourtState, cards: Cards, context: RallyContext, asOf = new Date()): AnalysisResult {
   const lawVersion = activeLawVersion(asOf)
   const issues = validateCourt(court, cards, context, asOf)
   const situation = classifySituation(court, context)
   if (issues.length) return { recommendations: [], issues, lawVersion, situation }
-  const candidates = generateCandidates(court, cards, context, situation)
+  const candidates = generateCandidates(court, cards, context, situation, lawVersion!)
   const filtered = candidates.filter((item) => {
     if (!item.evidenceIds.length) return false
     if (item.shotType === 'middleSmash' || item.shotType === 'straightSmash') {
@@ -235,16 +187,40 @@ export function analyze(court: CourtState, cards: Cards, context: RallyContext, 
     if (item.shotType === 'block') return court.balance !== 'offBalance'
     return true
   })
-  const recommendations = filtered.map((item) => {
-    const { score, attributeNote } = scoreCandidate(item, court, cards)
-    const movement = movementFor(court, item.shotType, item.target)
+  const recommendations = filtered.flatMap((item) => {
+    const evaluation = evaluateGuidedShot(court, cards, context, item.shotType, item.target,
+      lawVersion, SIMULATION_PARAMETERS, EVIDENCE_DATASET_VERSION)
+    if (evaluation.physicalRuleValidity.status !== 'valid'
+      || evaluation.executionDifficulty.level === 'almostImpossible'
+      || evaluation.tacticalQuality.level === 'insufficientEvidence') return []
+    const outcomes = evaluation.receiverCandidates.length
+      ? evaluation.receiverCandidates : evaluation.assumedReceiverOptions
+    const outcome = outcomes[0] ?? evaluation.defaultOutcome
+    const hitter = outcome.movements[court.hitterId]
+    const partner = outcome.movements[partnerOf(court.hitterId)]
+    const movement = {
+      hitterMovement: { to: hitter.actual, description: hitter.explanation } as Movement,
+      partnerMovement: { to: partner.actual, description: partner.explanation } as Movement,
+    }
+    const score = evaluation.tacticalQuality.internalRank
     const level: RecommendationLevel = score >= 76 ? 'strong' : score >= 61 ? 'recommended' : score >= 52 ? 'optional' : 'variation'
-    return {
+    const abilityNotes = evaluation.tacticalQuality.reasons.filter((reason) => reason.includes('能力设置')).join(' ')
+    return [{
       ...item, tacticalScore: score, level, hitterMovement: movement.hitterMovement,
       partnerMovement: movement.partnerMovement,
-      expectedOpponentResponses: responseOptions(court, item.shotType, movement),
-      explanation: { simple: `${item.explanation.simple}${attributeNote ? ` ${attributeNote}` : ''}`, advanced: `${item.explanation.advanced}${attributeNote ? ` ${attributeNote}` : ''}` },
-    }
+      evidenceIds: evaluation.tacticalQuality.evidenceIds,
+      expectedOpponentResponses: outcomes.flatMap((receiver) => {
+        const receiverId = receiver.receiver!.playerId
+        return responseOptions(court, item.shotType, movement).map((response) => ({
+          ...response,
+          id: response.id + '-' + receiverId,
+          title: response.title + (outcomes.length > 1 || receiver.receiver!.assumed ? '（' + receiverId + (receiver.receiver!.assumed ? ' 假设接起' : ' 接') + '）' : ''),
+          receiverId,
+          assumedReceiver: receiver.receiver!.assumed,
+        }))
+      }),
+      explanation: { simple: `${item.explanation.simple}${abilityNotes ? ` ${abilityNotes}` : ''}`, advanced: `${item.explanation.advanced}${abilityNotes ? ` ${abilityNotes}` : ''}` },
+    }]
   }).sort((a, b) => b.tacticalScore - a.tacticalScore).slice(0, 3).map(({ base, ...item }) => { void base; return item })
   return {
     recommendations,
@@ -252,35 +228,4 @@ export function analyze(court: CourtState, cards: Cards, context: RallyContext, 
     lawVersion,
     situation,
   }
-}
-
-export function advanceRally(court: CourtState, context: RallyContext, recommendation: TacticalRecommendation, response: ResponseOption): { court: CourtState; context: RallyContext; steps: ChainStep[] } {
-  const hitterId = court.hitterId
-  const partnerId = partnerOf(hitterId)
-  const firstFrom = { x: court.shuttle.x, y: court.shuttle.y, z: court.shuttle.z }
-  const responders = opponentIds(hitterId)
-  const responseHitter = responders.sort((a, b) => distance(court.players[a], recommendation.target) - distance(court.players[b], recommendation.target))[0]
-  const updatedPlayers = {
-    ...court.players,
-    [hitterId]: { ...court.players[hitterId], ...recommendation.hitterMovement.to },
-    [partnerId]: { ...court.players[partnerId], ...recommendation.partnerMovement.to },
-    [responseHitter]: { ...court.players[responseHitter], x: recommendation.target.x, y: recommendation.target.y },
-  }
-  const nextHitter = [hitterId, partnerId].sort((a, b) => distance(updatedPlayers[a], response.target) - distance(updatedPlayers[b], response.target))[0]
-  const nextCourt: CourtState = {
-    ...court, players: updatedPlayers,
-    shuttle: { ...court.shuttle, ...response.target, incomingShotType: response.shotType, shuttleSide: teamOf(nextHitter) },
-    hitterId: nextHitter, contactTiming: 'normal', contactSide: 'forehand', balance: 'balanced',
-  }
-  const nextContext: RallyContext = {
-    ...context, phase: context.phase === 'serve' ? 'third' : 'rally',
-    initiative: response.shotType === 'lift' ? 'attack' : response.shotType === 'drive' ? 'neutral' : 'transition',
-    exchange: response.shotType === 'net' || response.shotType === 'block' ? 'net' : response.shotType === 'drive' ? 'flat' : 'general',
-    shotIndex: Math.min(4, context.shotIndex + 2),
-  }
-  const steps: ChainStep[] = [
-    { id: crypto.randomUUID(), index: context.shotIndex + 1, hitterId, shotType: recommendation.shotType, title: recommendation.title, from: firstFrom, to: recommendation.target, hitterMovement: recommendation.hitterMovement, partnerMovement: recommendation.partnerMovement, evidenceIds: recommendation.evidenceIds },
-    { id: crypto.randomUUID(), index: context.shotIndex + 2, hitterId: responseHitter, shotType: response.shotType, title: response.title, from: recommendation.target, to: response.target, evidenceIds: recommendation.evidenceIds },
-  ]
-  return { court: nextCourt, context: nextContext, steps }
 }

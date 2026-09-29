@@ -101,7 +101,8 @@ export interface RallyContext {
 
 export type ShotType =
   | 'lowServe' | 'flickServe' | 'net' | 'push' | 'drive' | 'lift'
-  | 'middleSmash' | 'straightSmash' | 'straightDrop' | 'crossDrop' | 'block'
+  | 'middleSmash' | 'straightSmash' | 'crossSmash' | 'halfSmash'
+  | 'straightDrop' | 'crossDrop' | 'fastDrop' | 'clear' | 'block' | 'netKill'
 
 export type RecommendationLevel = 'strong' | 'recommended' | 'optional' | 'variation' | 'highRisk' | 'notRecommended'
 
@@ -116,6 +117,8 @@ export interface ResponseOption {
   shotType: ShotType
   target: Point3
   explanation: string
+  receiverId?: PlayerId
+  assumedReceiver?: boolean
 }
 
 export interface TacticalRecommendation {
@@ -143,6 +146,8 @@ export interface LawVersion {
   verifiedAt: string
   officialUrl: string
   evidenceId: string
+  serviceHeightLimitMeters: number
+  netHeightAtCentreMeters: number
 }
 
 export interface AnalysisIssue {
@@ -169,6 +174,9 @@ export interface ChainStep {
   hitterMovement?: Movement
   partnerMovement?: Movement
   evidenceIds: string[]
+  startCourt?: CourtState
+  endCourt?: CourtState
+  playerMovements?: Record<PlayerId, { from: Point; actual: Point; ideal: Point }>
 }
 
 export interface SavedScenario {
@@ -223,7 +231,8 @@ export const FORMAT_LABELS: Record<CompetitionFormat, string> = {
 export const SHOT_LABELS: Record<ShotType, string> = {
   lowServe: '低发球', flickServe: '偷后场发球', net: '放网', push: '推球', drive: '平抽挡',
   lift: '挑球', middleSmash: '杀中路', straightSmash: '直线杀球', straightDrop: '直线吊球',
-  crossDrop: '对角吊球', block: '挡网',
+  crossSmash: '对角杀球', halfSmash: '点杀', crossDrop: '对角吊球', fastDrop: '快吊',
+  clear: '高远球', block: '挡网', netKill: '扑球',
 }
 
 export const LEVEL_LABELS: Record<RecommendationLevel, string> = {

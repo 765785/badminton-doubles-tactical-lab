@@ -1,4 +1,5 @@
 import { defaultCards, type CourtState, type PlayerCard, type PlayerId, type RallyContext } from '../domain/model'
+import { activeLawVersion } from './laws'
 
 export interface PresetScenario {
   id: string
@@ -38,7 +39,7 @@ mixedCards.B.gender = 'female'
 mixedCards.D.gender = 'female'
 
 export const PRESETS: PresetScenario[] = [
-  standard('低发球 → 接发 → 第三拍', 'serve-low', '发接发', '从低发球观察两人如何分担网前与后场。', servePlayers, 'A', { x: 3.35, y: 8.9, z: .92, speed: 'slow', trajectory: 'arc' }, { phase: 'serve', initiative: 'neutral', exchange: 'general', shotIndex: 0, servingTeam: 1, serverId: 'A', receiverId: 'C', servingScore: 0 }, ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_SERVE'], false),
+  standard('低发球 → 接发 → 第三拍', 'serve-low', '发接发', '从低发球观察两人如何分担网前与后场。', servePlayers, 'A', { x: 3.35, y: 8.9, z: .92, speed: 'slow', trajectory: 'arc' }, { phase: 'serve', initiative: 'neutral', exchange: 'general', shotIndex: 0, servingTeam: 1, serverId: 'A', receiverId: 'C', servingScore: 0 }, ['COACH_BWF_L1_2017_SERVE'], false),
   standard('接发球以后两个人怎么跑？', 'return-follow', '发接发', '接发球员前压时，搭档继续覆盖中后场。', servePlayers, 'C', { x: 2.65, y: 4.35, z: 1.1, speed: 'medium', trajectory: 'flat' }, { phase: 'return', initiative: 'transition', exchange: 'net', shotIndex: 0, servingTeam: 1, serverId: 'A', receiverId: 'C', servingScore: 0 }, ['COACH_BWF_L1_2017_SERVE'], true),
   standard('双打进攻为什么前后站？', 'attack-formation', '进攻', '后场组织进攻，前场准备抢网与拦截。', attackPlayers, 'A', { x: 2.05, y: 10.7, z: 2.6, speed: 'medium', trajectory: 'arc' }, attackContext, ['COACH_BWF_L1_2017_ATTACK'], true),
   standard('双打防守为什么左右站？', 'defence-formation', '防守', '面对下压球时观察两人左右分工。', defencePlayers, 'A', { x: 1.65, y: 9.5, z: 1.05, speed: 'fast', trajectory: 'downward' }, defenceContext, ['COACH_BWF_L1_2017_DEFENCE'], true, 'straightSmash'),
@@ -48,11 +49,13 @@ export const PRESETS: PresetScenario[] = [
   standard('对角变化与恢复距离', 'cross-variation', '进攻', '对角球是有条件的变化，必须考虑直线反击。', { ...attackPlayers, B: { x: 3.5, y: 7.8 } }, 'A', { x: 1.75, y: 10.6, z: 2.7, speed: 'medium', trajectory: 'arc' }, attackContext, ['COACH_BWF_L1_2017_ATTACK']),
   standard('接杀挡网 → 防守转进攻', 'block-transition', '转换', '接杀球控制到网前后，击球者跟进，搭档补后场。', defencePlayers, 'A', { x: 1.65, y: 9.5, z: 1.05, speed: 'fast', trajectory: 'downward' }, defenceContext, ['COACH_BWF_L1_2017_DEFENCE'], false, 'straightSmash'),
   standard('平抽挡争夺主动', 'flat-exchange', '转换', '中场快节奏交换中仍要注意搭档覆盖。', flatPlayers, 'A', { x: 1.9, y: 8.6, z: 1.25, speed: 'fast', trajectory: 'flat' }, { phase: 'rally', initiative: 'neutral', exchange: 'flat', shotIndex: 0 }, ['COACH_BWF_L1_2017_DEFENCE'], false, 'drive'),
-  { ...standard('混双基础发接发', 'mixed-serve', '混双', '用四人个人能力和站位讨论发接发，不预设性别能力。', { A: { x: 3.8, y: 10.3 }, B: { x: 3.35, y: 8.9 }, C: { x: 3.75, y: 2.9 }, D: { x: 2.65, y: 4.35 } }, 'B', { x: 3.35, y: 8.9, z: .92, speed: 'slow', trajectory: 'arc' }, { phase: 'serve', initiative: 'neutral', exchange: 'general', shotIndex: 0, servingTeam: 1, serverId: 'B', receiverId: 'D', servingScore: 0 }, ['LAW_BWF_2025_01', 'COACH_BWF_L1_2017_MIXED']), cards: structuredClone(mixedCards) },
+  { ...standard('混双基础发接发', 'mixed-serve', '混双', '用四人个人能力和站位讨论发接发，不预设性别能力。', { A: { x: 3.8, y: 10.3 }, B: { x: 3.35, y: 8.9 }, C: { x: 3.75, y: 2.9 }, D: { x: 2.65, y: 4.35 } }, 'B', { x: 3.35, y: 8.9, z: .92, speed: 'slow', trajectory: 'arc' }, { phase: 'serve', initiative: 'neutral', exchange: 'general', shotIndex: 0, servingTeam: 1, serverId: 'B', receiverId: 'D', servingScore: 0 }, ['COACH_BWF_L1_2017_MIXED']), cards: structuredClone(mixedCards) },
   { ...standard('混双前后轮转', 'mixed-rotation', '混双', '前后职责随球的位置与球员能力调整。', attackPlayers, 'A', { x: 2.05, y: 10.7, z: 2.6, speed: 'medium', trajectory: 'arc' }, attackContext, ['COACH_BWF_L1_2017_MIXED']), cards: structuredClone(mixedCards) },
 ]
 
 export function findPreset(id: string): PresetScenario | undefined {
   const item = PRESETS.find((preset) => preset.id === id)
-  return item ? structuredClone(item) : undefined
+  if (!item) return undefined
+  const law = item.context.phase === 'serve' ? activeLawVersion() : null
+  return { ...structuredClone(item), evidenceIds: law ? [law.evidenceId, ...item.evidenceIds] : [...item.evidenceIds] }
 }

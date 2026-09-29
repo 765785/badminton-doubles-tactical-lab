@@ -107,6 +107,11 @@ export default function CourtBoard({ court, selected, playbackStep, progress = 0
           <ellipse cx={project({ x: target.x, y: target.y }).x} cy={project({ x: target.x, y: target.y }).y} rx="33" ry="17" fill="#ffba73" opacity=".34" stroke="#ffe0a7" strokeWidth="2"/>
           <path d={`M ${trajectoryStart.x} ${trajectoryStart.y} Q ${mid.x} ${mid.y} ${trajectoryEnd.x} ${trajectoryEnd.y}`} fill="none" stroke="#ffd5a0" strokeWidth="4" strokeDasharray="11 8" markerEnd="url(#arrow-orange)"/>
         </>}
+        {playbackStep?.playerMovements && (['A', 'B', 'C', 'D'] as PlayerId[]).map((id) => {
+          const movement = playbackStep.playerMovements![id]
+          const from = project(movement.from); const to = project(movement.actual)
+          return <path key={'step-' + id} d={'M ' + from.x + ' ' + from.y + ' L ' + to.x + ' ' + to.y} fill="none" stroke={teamOf(id) === teamOf(playbackStep.hitterId) ? '#64ffe8' : '#ffad75'} strokeWidth={teamOf(id) === teamOf(playbackStep.hitterId) ? 4 : 2.5} strokeDasharray="9 8" markerEnd={teamOf(id) === teamOf(playbackStep.hitterId) ? 'url(#arrow-teal)' : 'url(#arrow-orange)'}/>
+        })}
         {selected && (!playbackStep || playbackStep.id === 'preview') && [
           [court.hitterId, selected.hitterMovement], [partnerOf(court.hitterId), selected.partnerMovement],
         ].map(([id, movement]) => {
@@ -116,7 +121,12 @@ export default function CourtBoard({ court, selected, playbackStep, progress = 0
           return <path key={playerId} d={`M ${from.x} ${from.y - 5} Q ${(from.x + to.x) / 2} ${(from.y + to.y) / 2 - 20} ${to.x} ${to.y - 5}`} fill="none" stroke="#64ffe8" strokeWidth="4" strokeDasharray="9 8" markerEnd="url(#arrow-teal)"/>
         })}
         {(['C', 'D', 'A', 'B'] as PlayerId[]).map((id) => {
-          const point = project(court.players[id]); const current = court.hitterId === id
+          const stepMove = playbackStep?.playerMovements?.[id]
+          const actual = stepMove ? {
+            x: stepMove.from.x + (stepMove.actual.x - stepMove.from.x) * progress,
+            y: stepMove.from.y + (stepMove.actual.y - stepMove.from.y) * progress,
+          } : court.players[id]
+          const point = project(actual); const current = (playbackStep?.hitterId ?? court.hitterId) === id
           const fill = teamOf(id) === 1 ? '#1ed0c1' : '#ff7653'
           return <g key={id} transform={`translate(${point.x} ${point.y})`} onPointerDown={(event) => startDrag(event, id)} className="player-token" tabIndex={0} role="button" aria-label={`球员 ${id}，点击编辑，拖动调整位置`} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelectPlayer(id) } }}>
             <ellipse cy="5" rx="22" ry="10" fill="#073947" opacity=".48"/>

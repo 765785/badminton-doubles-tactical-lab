@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyze, advanceRally } from '../src/engine/analyze'
+import { analyze } from '../src/engine/analyze'
 import { activeLawVersion } from '../src/knowledge/laws'
 import { findPreset } from '../src/knowledge/scenarios'
 import { competitionFormat } from '../src/domain/model'
@@ -93,38 +93,5 @@ describe('分析结果数量与可靠性', () => {
     scene.cards.A.attributes.smashPower = 95
     const after = analyze(scene.court, scene.cards, scene.context, now).recommendations.find((item) => item.id === 'attack-middle')!
     expect(after.tacticalScore).toBeGreaterThan(before.tacticalScore)
-  })
-})
-
-describe('逐拍分支', () => {
-  it('低发球接发后进入第三拍，保存两次击球和搭档移动', () => {
-    const scene = preset('serve-low')
-    const result = analyze(scene.court, scene.cards, scene.context, now)
-    const recommendation = result.recommendations[0]
-    const response = recommendation.expectedOpponentResponses[0]
-    const next = advanceRally(scene.court, scene.context, recommendation, response)
-    expect(next.steps).toHaveLength(2)
-    expect(next.steps[0].hitterMovement).toBeDefined()
-    expect(next.steps[0].partnerMovement).toBeDefined()
-    expect(next.context.phase).toBe('third')
-    expect(next.context.shotIndex).toBe(2)
-    expect(analyze(next.court, scene.cards, next.context, now).lawVersion).not.toBeNull()
-  })
-  it('对手挡网后进入网前转换，不误写成接杀防守', () => {
-    const scene = preset('return-follow')
-    const result = analyze(scene.court, scene.cards, scene.context, now)
-    const next = advanceRally(scene.court, scene.context, result.recommendations[0], result.recommendations[0].expectedOpponentResponses[0])
-    const follow = analyze(next.court, scene.cards, next.context, now)
-    expect(follow.situation).toBe('transition')
-    expect(follow.recommendations.every((item) => item.shotType !== 'block')).toBe(true)
-  })
-  it('从接发预设开始的教学链最多记录四次击球', () => {
-    const scene = preset('return-follow')
-    const first = analyze(scene.court, scene.cards, scene.context, now).recommendations[0]
-    const secondState = advanceRally(scene.court, scene.context, first, first.expectedOpponentResponses[0])
-    const third = analyze(secondState.court, scene.cards, secondState.context, now).recommendations[0]
-    const fourthState = advanceRally(secondState.court, secondState.context, third, third.expectedOpponentResponses[0])
-    expect([...secondState.steps, ...fourthState.steps].map((step) => step.index)).toEqual([1, 2, 3, 4])
-    expect(fourthState.context.shotIndex).toBe(4)
   })
 })

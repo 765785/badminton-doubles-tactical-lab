@@ -10,6 +10,8 @@ export const LAW_VERSIONS: LawVersion[] = [{
   verifiedAt: '2026-09-29',
   officialUrl: 'https://extranet.bwf.sport/docs/document-system/81/1466/1470/Section%204.1%20-%20Laws%20of%20Badminton%20-%2026%20April%202025%20V5.0%20(2)%20.pdf',
   evidenceId: 'LAW_BWF_2025_01',
+  serviceHeightLimitMeters: 1.15,
+  netHeightAtCentreMeters: 1.524,
 }]
 
 export function activeLawVersion(date = new Date()): LawVersion | null {

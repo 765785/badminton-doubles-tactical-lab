@@ -1,5 +1,6 @@
 import { openDB } from 'idb'
 import type { PlayerCard, PlayerId, SavedScenario } from '../domain/model'
+import type { RallySession } from '../domain/rally'
 
 export interface SavedPlayer {
   schemaVersion: 1
@@ -9,14 +10,25 @@ export interface SavedPlayer {
   updatedAt: string
 }
 
-const dbPromise = openDB('badminton-tactical-lab', 1, {
+const dbPromise = openDB('badminton-tactical-lab', 2, {
   upgrade(db) {
     if (!db.objectStoreNames.contains('players')) db.createObjectStore('players', { keyPath: 'id' })
     if (!db.objectStoreNames.contains('scenarios')) db.createObjectStore('scenarios', { keyPath: 'id' })
+    if (!db.objectStoreNames.contains('rallies')) db.createObjectStore('rallies', { keyPath: 'id' })
   },
 })
 
 export const localRepository = {
+  async listRallies(): Promise<RallySession[]> {
+    return ((await (await dbPromise).getAll('rallies')) as RallySession[])
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  },
+  async saveRally(session: RallySession): Promise<void> {
+    await (await dbPromise).put('rallies', structuredClone(session))
+  },
+  async removeRally(id: string): Promise<void> {
+    await (await dbPromise).delete('rallies', id)
+  },
   async listPlayers(): Promise<SavedPlayer[]> {
     return ((await (await dbPromise).getAll('players')) as SavedPlayer[]).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
   },

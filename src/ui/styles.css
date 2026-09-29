@@ -1535,3 +1535,257 @@ summary:focus-visible {
     animation: none !important;
   }
 }
+
+/* 连续回合工作区沿用原战术板的颜色与网格。 */
+.sandbox-page .rail-section p {
+  line-height: 1.6;
+}
+.sandbox-toolbar {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.sandbox-toolbar button {
+  min-height: 35px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+.sandbox-label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  color: #32516c;
+  font-size: 12px;
+  font-weight: 750;
+  margin-top: 10px;
+}
+.sandbox-label input,
+.sandbox-label select,
+.shot-form input,
+.shot-form select,
+.sandbox-under select {
+  min-height: 36px;
+  border: 1px solid #cddce8;
+  border-radius: 7px;
+  background: #fff;
+  color: #163650;
+  padding: 7px 9px;
+  max-width: 100%;
+}
+.constraint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: #31536e;
+  font-size: 12px;
+}
+.constraint-row input {
+  accent-color: #0877a9;
+}
+.sandbox-under {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+.sandbox-under label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.sandbox-under input {
+  accent-color: #58d8ce;
+}
+.sandbox-under select {
+  min-height: 30px;
+  padding: 3px 5px;
+}
+.sandbox-under a {
+  margin-left: auto;
+}
+.shot-confirm {
+  color: #1c3b53;
+  background: #f8fcff;
+  padding: 17px 22px 20px;
+  border-top: 1px solid #d4e8f4;
+}
+.shot-confirm h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.shot-confirm p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 9px 0;
+}
+.shot-confirm details {
+  margin: 12px 0;
+}
+.shot-confirm summary {
+  color: #12689a;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.shot-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 13px 0;
+}
+.shot-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 750;
+  color: #31536c;
+}
+.shot-form input,
+.shot-form select {
+  width: 100%;
+}
+.rally-ended {
+  margin: 0;
+  padding: 12px 20px;
+  color: #fff4d9;
+  background: #7b4d2c;
+  font-size: 13px;
+}
+.sandbox-analysis section {
+  border-bottom: 1px solid #e6eef4;
+  padding: 14px 0;
+}
+.sandbox-analysis h3 {
+  margin: 0 0 8px;
+  color: #153a56;
+  font-size: 14px;
+}
+.sandbox-analysis section p {
+  font-size: 12px;
+  line-height: 1.65;
+  color: #49677f;
+  margin: 5px 0;
+}
+.sandbox-result section strong {
+  font-size: 13px;
+  color: #135482;
+}
+.sandbox-result details {
+  padding: 8px 0;
+  border-top: 1px solid #e4edf4;
+}
+.sandbox-result details summary {
+  cursor: pointer;
+  font-weight: 750;
+  font-size: 12px;
+  color: #1d587d;
+}
+.sandbox-result .commit-button {
+  width: 100%;
+  margin-top: 15px;
+}
+.sandbox-suggestions button,
+.receiver-button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #dce9f3;
+  border-radius: 7px;
+  background: #f4f9fd;
+  color: #245475;
+  padding: 9px 10px;
+  margin-top: 7px;
+  font-size: 12px;
+}
+.sandbox-suggestions button:hover,
+.receiver-button:hover {
+  border-color: #6bb8e2;
+}
+.sandbox-timeline {
+  flex-wrap: wrap;
+}
+.sandbox-timeline .timeline-steps button {
+  flex: none;
+  font-size: 12px;
+  color: #56758d;
+  padding: 8px 10px;
+  background: #f1f6fa;
+  border: 0;
+  border-radius: 6px;
+}
+.sandbox-timeline .timeline-steps button.current {
+  background: #dbeeff;
+  color: #145992;
+  font-weight: 800;
+}
+.stage-controls,
+.branch-actions {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+  width: 100%;
+  font-size: 12px;
+}
+.stage-controls button,
+.branch-actions button {
+  border: 1px solid #d6e6f1;
+  border-radius: 6px;
+  background: #f2f8fc;
+  color: #2b5d7e;
+  padding: 7px 9px;
+  font-size: 11px;
+}
+.branch-comparison {
+  width: 100%;
+  border-top: 1px solid #e2edf4;
+  padding-top: 9px;
+  color: #3e617b;
+  font-size: 12px;
+}
+.branch-comparison p {
+  margin: 4px 0;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 980px) {
+  .sandbox-page {
+    grid-template-areas: "board" "rail" "analysis" "timeline";
+  }
+  .sandbox-page .analysis-panel {
+    display: block;
+  }
+  .sandbox-page .left-rail:not(.mobile-open) {
+    display: none;
+  }
+}
+@media (max-width: 680px) {
+  .sandbox-page .board-top-actions {
+    flex-wrap: wrap;
+  }
+  .sandbox-page .board-top-actions button {
+    flex: 1;
+    padding: 7px;
+  }
+  .shot-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .shot-confirm {
+    padding: 14px;
+  }
+  .sandbox-under a {
+    display: inline;
+  }
+}

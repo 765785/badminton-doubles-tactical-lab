@@ -1,20 +1,33 @@
 # 技术架构
 
-## 分层
+## 两种流程，一套逐拍引擎
 
-- `domain`：米制球场坐标、四张独立球员名片、球状态、击球条件、规则版本与赛制分类。
-- `knowledge`：证据索引、可追溯战术条目、已核验预设。源码只含原创中文归纳与链接，不存第三方教材文件。
-- `engine`：纯函数，依次进行有效版本选择、状态检查、候选生成、可行性过滤、覆盖与空间评估、解释。返回 `AnalysisResult`，其中 `recommendations` 长度为 0–3，`issues` 说明零结果。
-- `visualization`：二维球场坐标投影为斜视 SVG；羽毛球高度以地面影子和轨迹弧表示。动画只插值教学状态，不模拟真实空气动力学。
-- `storage`：IndexedDB 中的球员和场景对象仓库，使用结构版本号与升级函数；UI 不直接访问数据库。
-- `ui`：React 页面、球场、球员编辑、分析面板、证据页和播放控件。战术判断不得置于组件中。
+- `src/engine/coreRally.ts` 的 `evaluateConfirmedShot` 是纯函数，显式接收米制 `CourtState`、四张 `PlayerCard`、`RallyContext`、已确认球路、当前有效规则、证据版本、`SimulationParameters` 和运动约束。函数不读时间、不用随机数、不访问 DOM。
+- `src/engine/guidedLesson.ts` 是预设教学控制器：选预设、控制 2–4 拍教学节奏、组合讲解。每次击球均调用核心引擎；推荐候选由 `analyze.ts` 生成后仍需通过相同的核心评价。
+- `src/ui/SandboxPage.tsx` 是自由回合控制器：画线、确认球种、选择接球人、保存、分支和重播。它也调用相同的核心引擎，没有第二套球路、移动、覆盖或阵型算法。
+- `src/engine/simulationParameters.ts` 集中版本化教学运动参数，包括飞行时间、轨迹、起步、加速、转向、失衡、恢复、覆盖、Reach、候选接球和击球难度。改数值必须提高参数版本。
 
-## 主要接口
+同一完整输入（含接球人选择、运动约束、规则和参数版本）得到相同结果。屏幕尺寸只影响 `src/visualization/` 中的投影与指针逆变换；战术计算不读取 CSS/SVG 像素。
 
-`PlayerCard` 包含 id、名称、性别、惯用手、简易等级、18 项 0–100 属性和可选身体参数。`CourtState` 包含四人位置、球的 x/y/z 与方向、击球者及平衡等接触条件。`RallyContext` 用独立字段表示击球阶段、主动权、交换类型、发球者和回合拍数。`LawVersion` 包含版本、生效区间、核验日期、官方 URL 与 Evidence ID。
+## 固定计算顺序
 
-`analyze(court, cards, context)` 不修改输入，返回可用推荐及不可用原因。`advanceRally` 根据用户选中的击球及对手回应构造下一状态；每个接触计一拍，最多四拍。预设和保存对象均带数据版本，防止以后字段调整破坏旧存档。
+`ShotDraft` → 用户确认球种 → 规则与物理成立性 → 执行难度 → 战术质量 → 球轨迹 → 四人理想目标 → 运动约束 → 可达移动 → T2 实际位置 → 覆盖 → 双方阵型 → 四人职责 → 接球候选 → 搭档配合 → 结束条件 → 新 `CourtState` → 快照。
+
+三类评价分别保存，不合成单一分数。内部战术排序分不是胜率。候选接球人各有独立的 T2 四人结果；两名合理候选时由用户选择，无人可达时默认落地结束。实验性假设接球在结果中显式标记，球员不会瞬移。
+
+`hold` 约束让球员 T0→T2 的移动目标及实际位置保持在当前坐标，后续阵型、覆盖和下一拍均读取这个位置。`manualTarget` 已在接口中预留，本版不提供操作界面。
+
+## 状态、历史与保存
+
+- `RallySession` 以父节点引用组成分支树。`RallyShot` 创建时深拷贝球员、前后局面、三类评价、四人运动、覆盖、阵型、证据和羽毛球轨迹；后续只改变当前节点指针，不改历史节点。
+- 会话和节点保存 `schemaVersion`、`engineVersion`、`simulationParametersVersion`、`evidenceDatasetVersion`。旧回合重播读取节点的实际位置与轨迹快照；从旧节点再开分支调用当前引擎，可能使用更新后的版本。
+- `src/storage/localRepository.ts` 使用 IndexedDB v2，新增 `rallies` 对象仓库；原 `players` 和 `scenarios` 仓库继续可读。旧教学局面可直接打开，也可复制为新自由回合。
+- 第一拍后改球员能力会从当前局面创建新会话，避免更改旧节点的名片和结果。
+
+## 模型边界
+
+移动和球轨迹是**教学用途的启发式模型**。模型以距离、能力、平衡、启动和预计飞行时间作可复现估算，未用运动捕捉或比赛数据校准，不声称能精确预测真实人体到位时间。画线只给方向与落点，球种须用户确认；明确无法过网、出界或已落地按相应结果处理。
 
 ## 部署
 
-React + TypeScript + Vite 构建静态文件。Vite `base` 固定为 `/badminton-doubles-tactical-lab/`，HashRouter 避免 Pages 子页面刷新 404。CI 在部署前完成类型检查、Lint、测试和生产构建；GitHub Pages 仅接收成功构建产物。浏览器端无需 API Key、服务器或账号。
+React + TypeScript + Vite 构建静态文件。`base` 为 `/badminton-doubles-tactical-lab/`，HashRouter 支持 GitHub Pages 子路径。CI 在部署前完成类型检查、Lint、单测、构建与浏览器端到端测试。浏览器端无需 API Key、服务器或账号。
